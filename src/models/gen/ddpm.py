@@ -54,7 +54,8 @@ class DDPM(BaseDiffusionModel):
         self.criterion = nn.MSELoss()        
 
     def forward(self, imgs: torch.Tensor, prev_frames: torch.Tensor, prev_actions: torch.Tensor):
-        assert prev_frames.shape[1] == prev_actions.shape[1] == self.context_length
+        # print(f"prev_frames shape: {prev_frames.shape}, prev_actions shape: {prev_actions.shape}, imgs shape: {imgs.shape}")
+        assert prev_frames.shape[1] == prev_actions.shape[2] == self.context_length
         t = torch.randint(low=1, high=self.T+1, size=(imgs.shape[0],), device=self.device)
         noise = torch.randn_like(imgs, device=self.device)
         batch_size, channels, width, height = imgs.shape

@@ -1,5 +1,5 @@
 training:
-  epochs: 30
+  epochs: 10
   batch_size: 4
   num_workers: 2
   save_every_epoch: 2
@@ -9,7 +9,7 @@ generation:
   input_channels: 3
   output_channels: 3
   context_length: 4
-  actions_count: 5
+  actions_count: 18
 
 edm:
   p_mean: -1.2
@@ -33,3 +33,4 @@ ddpm:
     channels: [64, 64, 64, 64]
     cond_channels: 256
     attn_step_indexes: [false, false, false, false]
+    # player_autoencoder: "/home/monsh/works/image/boxing/weights/action_autoencoder.pth"

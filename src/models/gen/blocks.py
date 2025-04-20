@@ -9,6 +9,52 @@ import torch.nn as nn
 from torch.nn import functional as F
 import math
 
+
+class ActionEmbedding(nn.Module):
+    def __init__(self, action_counts: int, cond_dimension: int):
+        super(ActionEmbedding, self).__init__()
+        self.action_embedding = nn.Sequential(
+            nn.Embedding(action_counts, cond_dimension),
+            nn.Flatten(),
+        )
+        
+    def forward(self, action):
+        return self.action_embedding(action)
+
+class ActionAutoEncoder(nn.Module):
+    def __init__(
+        self, 
+        action_counts: int, 
+        cond_dimension: int,
+        num_players: int = 2,
+        sequence_length: int = 8,
+    ):
+        self.cond_dimension = cond_dimension
+
+        super(ActionAutoEncoder, self).__init__()
+        self.action_embedding = ActionEmbedding(action_counts, cond_dimension // sequence_length) # (batch, cond_dimension)
+
+        self.encoder = nn.Linear(cond_dimension * num_players, cond_dimension)
+        self.decoder = nn.Linear(cond_dimension, cond_dimension * num_players)
+
+    # def get_latent_space(self, action):
+    #     batch_size, num_players, sequence_length = action.size()
+    #     x = action.view(batch_size * num_players, sequence_length)
+    #     x = self.action_embedding(x)
+    #     x = x.view(batch_size, num_players * self.cond_dimension) # (batch, cond_dimension * num_players)
+    #     x = self.encoder(x)
+    #     return x
+    
+    def forward(self, action):
+        batch_size, num_players, sequence_length = action.size()
+        x = action.view(batch_size * num_players, sequence_length)
+        x = self.action_embedding(x) # (batch * num_players, cond_dimension)
+        x = x.view(batch_size, num_players * self.cond_dimension) # (batch, cond_dimension * num_players)
+        x = self.encoder(x) # (batch, cond_dimension) # Latent space
+        # x = self.decoder(x) # (batch, cond_dimension * num_players)
+
+        return x
+
 class BaseDiffusionModel(nn.Module, ABC):
     @torch.no_grad()
     @abc.abstractmethod
@@ -154,6 +200,7 @@ class UNetConfig:
     channels: List[int]
     cond_channels: int
     attn_step_indexes: List[bool]
+    # player_autoencoder: Optional[str]
 
 class UNet(nn.Module):
     @classmethod
@@ -175,7 +222,8 @@ class UNet(nn.Module):
             steps=config.steps,
             channels=config.channels,
             cond_channels=config.cond_channels,
-            attn_step_indexes=config.attn_step_indexes
+            attn_step_indexes=config.attn_step_indexes,
+            # player_autoencoder=config.player_autoencoder
         )
 
     def __init__(
@@ -188,15 +236,20 @@ class UNet(nn.Module):
         steps=(2, 2, 2, 2),
         channels = (64, 64, 64, 64),
         cond_channels = 256,
-        attn_step_indexes = [False, False, False, False]
+        attn_step_indexes = [False, False, False, False],
     ):
         super().__init__()
         assert len(steps) == len(channels) == len(attn_step_indexes)
+        
+        self.autoencoder = ActionAutoEncoder(actions_count, cond_channels, num_players=2, sequence_length=seq_length)
+        # self.autoencoder.load_state_dict(torch.load(player_autoencoder))
+        # self.autoencoder.eval()
+
         self.time_embedding = PositionalEmbedding(T=T, output_dim=cond_channels) if T is not None else FloatPositionalEmbedding(output_dim=cond_channels)
-        self.actions_embedding = nn.Sequential(
-            nn.Embedding(actions_count, cond_channels // seq_length),
-            nn.Flatten()
-        )
+        # self.actions_embedding = nn.Sequential(
+        #     nn.Embedding(actions_count, cond_channels // seq_length),
+        #     nn.Flatten()
+        # )
         self.cond_embedding = nn.Sequential(
             nn.Linear(cond_channels, cond_channels),
             nn.ReLU(),
@@ -245,7 +298,13 @@ class UNet(nn.Module):
     def forward(self, x: torch.Tensor, t: torch.Tensor, prev_actions: torch.Tensor):
         assert x.shape[0] == prev_actions.shape[0]
         time_emb = self.time_embedding(t)
-        actions_emb = self.actions_embedding(prev_actions)
+
+        # print(prev_actions.shape)
+        # print(prev_actions)
+        actions_emb = self.autoencoder(prev_actions)
+        # actions_emb = self.actions_embedding(prev_actions)
+        # with torch.no_grad():
+        
         cond = self.cond_embedding(time_emb + actions_emb)
 
         x = self.first_conv(x)

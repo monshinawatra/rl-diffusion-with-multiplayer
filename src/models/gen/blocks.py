@@ -21,7 +21,7 @@ class ActionEmbedding(nn.Module):
     def forward(self, action):
         return self.action_embedding(action)
 
-class ActionAutoEncoder(nn.Module):
+class ActionEncoder(nn.Module):
     def __init__(
         self, 
         action_counts: int, 
@@ -31,19 +31,9 @@ class ActionAutoEncoder(nn.Module):
     ):
         self.cond_dimension = cond_dimension
 
-        super(ActionAutoEncoder, self).__init__()
+        super(ActionEncoder, self).__init__()
         self.action_embedding = ActionEmbedding(action_counts, cond_dimension // sequence_length) # (batch, cond_dimension)
-
         self.encoder = nn.Linear(cond_dimension * num_players, cond_dimension)
-        self.decoder = nn.Linear(cond_dimension, cond_dimension * num_players)
-
-    # def get_latent_space(self, action):
-    #     batch_size, num_players, sequence_length = action.size()
-    #     x = action.view(batch_size * num_players, sequence_length)
-    #     x = self.action_embedding(x)
-    #     x = x.view(batch_size, num_players * self.cond_dimension) # (batch, cond_dimension * num_players)
-    #     x = self.encoder(x)
-    #     return x
     
     def forward(self, action):
         batch_size, num_players, sequence_length = action.size()
@@ -51,7 +41,6 @@ class ActionAutoEncoder(nn.Module):
         x = self.action_embedding(x) # (batch * num_players, cond_dimension)
         x = x.view(batch_size, num_players * self.cond_dimension) # (batch, cond_dimension * num_players)
         x = self.encoder(x) # (batch, cond_dimension) # Latent space
-        # x = self.decoder(x) # (batch, cond_dimension * num_players)
 
         return x
 
@@ -241,15 +230,9 @@ class UNet(nn.Module):
         super().__init__()
         assert len(steps) == len(channels) == len(attn_step_indexes)
         
-        self.autoencoder = ActionAutoEncoder(actions_count, cond_channels, num_players=2, sequence_length=seq_length)
-        # self.autoencoder.load_state_dict(torch.load(player_autoencoder))
-        # self.autoencoder.eval()
+        self.autoencoder = ActionEncoder(actions_count, cond_channels, num_players=2, sequence_length=seq_length)
 
         self.time_embedding = PositionalEmbedding(T=T, output_dim=cond_channels) if T is not None else FloatPositionalEmbedding(output_dim=cond_channels)
-        # self.actions_embedding = nn.Sequential(
-        #     nn.Embedding(actions_count, cond_channels // seq_length),
-        #     nn.Flatten()
-        # )
         self.cond_embedding = nn.Sequential(
             nn.Linear(cond_channels, cond_channels),
             nn.ReLU(),
@@ -298,12 +281,7 @@ class UNet(nn.Module):
     def forward(self, x: torch.Tensor, t: torch.Tensor, prev_actions: torch.Tensor):
         assert x.shape[0] == prev_actions.shape[0]
         time_emb = self.time_embedding(t)
-
-        # print(prev_actions.shape)
-        # print(prev_actions)
         actions_emb = self.autoencoder(prev_actions)
-        # actions_emb = self.actions_embedding(prev_actions)
-        # with torch.no_grad():
         
         cond = self.cond_embedding(time_emb + actions_emb)
 

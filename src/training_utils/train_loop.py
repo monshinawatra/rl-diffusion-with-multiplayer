@@ -58,9 +58,11 @@ def train_loop(
             optimizer.step()
             training_loss += loss.item()
             pbar.set_description(f"loss for epoch {epoch}: {training_loss / (index + 1):.4f}")
+        
+        pbar = tqdm.tqdm(val_dataloader)
         model.eval()
         with torch.no_grad():
-            for index, (imgs, previous_frames, previous_actions) in enumerate(val_dataloader):
+            for index, (imgs, previous_frames, previous_actions) in enumerate(pbar):
                 imgs = imgs.to(device)
                 previous_frames = previous_frames.to(device)
                 previous_actions = previous_actions.to(device)

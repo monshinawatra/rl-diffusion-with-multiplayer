@@ -1,14 +1,14 @@
 training:
-  epochs: 10
+  epochs: 100
   batch_size: 4
   num_workers: 2
-  save_every_epoch: 2
+  save_every_epoch: 5
 
 generation:
   image_size: 64
   input_channels: 3
   output_channels: 3
-  context_length: 4
+  context_length: 8
   actions_count: 18
 
 edm:

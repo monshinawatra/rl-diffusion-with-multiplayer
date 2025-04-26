@@ -8,3 +8,17 @@ pygame
 numpy
 tqdm
 ipywidgets
+accelerate
+datasets
+imageio
+opencv-python
+tokenizers
+transformers
+
+# AutoROM
+# box2d-py==2.3.5
+# contourpy
+# gymnasium
+# huggingface-hub
+# moviepy
+# pettingzoo

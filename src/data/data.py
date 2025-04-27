@@ -58,7 +58,7 @@ class SequencesDataset(Dataset):
         return len(self.dataset_indices)
     
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        start, end = self.get_session(index, self.seq_length)
+        start, end = self.get_session(index, self.seq_length + 1)
         actions1 = self.dataset[start:end]['first_0']
         actions2 = self.dataset[start:end]['second_0']
         

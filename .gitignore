@@ -1,5 +1,6 @@
 src/output
 src/val_images
+experiment
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

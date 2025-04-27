@@ -25,16 +25,20 @@ class ActionEncoder(nn.Module):
     def __init__(
         self, 
         action_counts: int, 
-        cond_dimension: int,
+        cond_channels: int,
         num_players: int = 2,
         sequence_length: int = 8,
     ):
-        self.cond_dimension = cond_dimension
+        self.cond_dimension = cond_channels
 
         super(ActionEncoder, self).__init__()
-        self.action_embedding = ActionEmbedding(action_counts, cond_dimension // sequence_length) # (batch, cond_dimension)
-        self.encoder = nn.Linear(cond_dimension * num_players, cond_dimension)
-    
+        self.action_embedding = ActionEmbedding(action_counts, cond_channels // sequence_length) # (batch, cond_dimension) 
+        self.encoder = nn.Sequential(
+            nn.Linear(cond_channels * num_players, cond_channels * 2),
+            nn.ReLU(inplace=True), # Add ReLU
+            nn.Linear(cond_channels * 2, cond_channels),
+        )
+
     def forward(self, action):
         batch_size, num_players, sequence_length = action.size()
         x = action.view(batch_size * num_players, sequence_length)
@@ -230,7 +234,7 @@ class UNet(nn.Module):
         super().__init__()
         assert len(steps) == len(channels) == len(attn_step_indexes)
         
-        self.autoencoder = ActionEncoder(actions_count, cond_channels, num_players=2, sequence_length=seq_length)
+        self.action_encoder = ActionEncoder(actions_count, cond_channels, num_players=2, sequence_length=seq_length)
 
         self.time_embedding = PositionalEmbedding(T=T, output_dim=cond_channels) if T is not None else FloatPositionalEmbedding(output_dim=cond_channels)
         self.cond_embedding = nn.Sequential(
@@ -281,7 +285,7 @@ class UNet(nn.Module):
     def forward(self, x: torch.Tensor, t: torch.Tensor, prev_actions: torch.Tensor):
         assert x.shape[0] == prev_actions.shape[0]
         time_emb = self.time_embedding(t)
-        actions_emb = self.autoencoder(prev_actions)
+        actions_emb = self.action_encoder(prev_actions)
         
         cond = self.cond_embedding(time_emb + actions_emb)
 
